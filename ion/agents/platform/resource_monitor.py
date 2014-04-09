@@ -26,8 +26,8 @@ import pprint
 
 # Platform attribute values are reported for the stream name "parsed".
 # TODO confirm this.
-_STREAM_NAME = "parsed"
-
+#_STREAM_NAME = "parsed"
+_STREAM_NAME = "sec_node_eng_data"
 # A small "ION System time" compliant increment to the latest received timestamp
 # for purposes of the next request so we don't get that last sample repeated.
 # Since "ION system time" is in milliseconds, this delta is in milliseconds.
@@ -73,10 +73,12 @@ class ResourceMonitor(object):
         # and "ION System time" compliant timestamp of last retrieved value for
         # each attribute:
         self._last_ts_millis = {}
+        
+#        self._attr_id_to_ion_parameter_name = {}
 
         for attr_defn in self._attr_defns:
-            if 'attr_id' in attr_defn:
-                attr_id = attr_defn['attr_id']
+            if 'ion_parameter_name' in attr_defn:
+                attr_id = attr_defn['ion_parameter_name']
                 self._attr_ids.append(attr_id)
                 self._last_ts_millis[attr_id] = None
             else:
@@ -169,6 +171,7 @@ class ResourceMonitor(object):
                       attr_id, from_time, curr_time_millis - from_time)
 
             attrs.append((attr_id, from_time))
+            
 
         log.debug("%r: _retrieve_attribute_values: attrs=%s",
                   self._platform_id, attrs)

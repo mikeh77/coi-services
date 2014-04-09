@@ -35,6 +35,8 @@ from pyon.core.object import ion_serializer, IonObjectDeserializer
 from pyon.core.registry import IonObjectRegistry
 from ion.core.ooiref import OOIReferenceDesignator
 
+from ion.agents.platform.util.NodeConfiguration import NodeConfiguration
+
 class RSNPlatformDriverState(PlatformDriverState):
     """
     We simply inherit the states from the superclass
@@ -147,8 +149,12 @@ class RSNPlatformDriver(PlatformDriver):
         @param driver_config with required 'oms_uri' entry.
         """
         PlatformDriver.configure(self, driver_config)
-        self._construct_resource_schema()
+        self.nodeCfgFile = NodeConfiguration()
+        self.nodeCfgFile.Open(self._platform_id,self._driver_config['driver_cfg_file']['default_cfg_file'],self._driver_config['driver_cfg_file']['node_cfg_file'])
 
+        self._construct_resource_schema()
+        
+    
     def _construct_resource_schema(self):
         """
         """
@@ -364,8 +370,15 @@ class RSNPlatformDriver(PlatformDriver):
 
         # convert the ION system time from_time to NTP, as this is the time
         # format used by the RSN OMS interface:
-        attrs_ntp = [(attr_id, ion_ts_2_ntp(from_time))
+        
+        # also convert the ION parameter names to RSN attribute IDs
+        attrs_ntp = [(self.nodeCfgFile.GetAttrFromParameter(attr_id), ion_ts_2_ntp(from_time))
                      for (attr_id, from_time) in attrs]
+        
+        
+        
+        
+        log.debug("get_attribute_values(ntp): attrs=%s", attrs_ntp)
 
         try:
             retval = self._rsn_oms.attr.get_platform_attribute_values(self._platform_id,
@@ -378,9 +391,23 @@ class RSNPlatformDriver(PlatformDriver):
                                     "requested platform '%s'" % self._platform_id)
 
         attr_values = retval[self._platform_id]
+        
+        attrs_return = {}
+        
+        #convert back to ION parameter name and scale from OMS to ION
+        for key in attr_values :
+            newAttrList = []
+            scaleFactor = self.nodeCfgFile.GetScaleFactorFromAttr(key)
+            for v, ts in attr_values[key]:
+                newAttrList.append((v*scaleFactor,ts))
+            attrs_return[self.nodeCfgFile.GetParameterFromAttr(key)] = newAttrList
+            
+        log.debug("Back to ION=%s", attrs_return)
+
+        
 
         # reported timestamps are already in NTP. Just return the dict:
-        return attr_values
+        return attrs_return
 
     def _validate_set_attribute_values(self, attrs):
         """

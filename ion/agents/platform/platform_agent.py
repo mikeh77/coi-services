@@ -32,6 +32,7 @@ from ion.agents.platform.platform_driver_event import StateChangeDriverEvent
 from ion.agents.platform.platform_driver_event import AsyncAgentEvent
 from ion.agents.platform.exceptions import CannotInstantiateDriverException
 from ion.agents.platform.util.network_util import NetworkUtil
+from ion.agents.platform.util.NodeConfiguration import NodeConfiguration
 from ion.agents.agent_alert_manager import AgentAlertManager
 
 from ion.agents.platform.platform_driver import PlatformDriverEvent, PlatformDriverState
@@ -84,6 +85,7 @@ class PlatformAgentState(BaseEnum):
     LOST_CONNECTION   = ResourceAgentState.LOST_CONNECTION
     MISSION_STREAMING = 'PLATFORM_AGENT_STATE_MISSION_STREAMING'
     MISSION_COMMAND   = 'PLATFORM_AGENT_STATE_MISSION_COMMAND'
+
 
 class PlatformAgentEvent(BaseEnum):
     ENTER                     = ResourceAgentEvent.ENTER
@@ -188,6 +190,13 @@ class PlatformAgent(ResourceAgent):
     def __init__(self):
         log.info("PlatformAgent constructor called")
         ResourceAgent.__init__(self)
+
+        #for data read in from the node configuration file (if present)
+        #include MetaData/Port Info/Attributes Info
+        self._yaml_config_info = None
+        
+        self._stream_config = None
+
 
         #This is the type of Resource managed by this agent
         self.resource_type = RT.PlatformDevice
@@ -399,6 +408,7 @@ class PlatformAgent(ResourceAgent):
         if stream_info is None:
             msg = "PlatformAgent._validate_configuration: 'stream_config' key not in configuration"
             log.error(msg)
+        self._stream_config=stream_info
         for stream_name, stream_config in stream_info.iteritems():
             if 'stream_def_dict' not in stream_config:
                 msg = "PlatformAgent._validate_configuration: 'stream_def_dict' key not in configuration for stream %r" % stream_name
@@ -449,7 +459,15 @@ class PlatformAgent(ResourceAgent):
         #
         # set platform attributes:
         #
-        if 'attributes' in self._driver_config:
+        if 'driver_cfg_file' in self._driver_config:
+            log.debug("PlatformAgent.read_driver_config_file= %s" %self._driver_config['driver_cfg_file'])
+            self.nodeCfgFile = NodeConfiguration()
+            self.nodeCfgFile.Open(self._platform_id,self._driver_config['driver_cfg_file']['default_cfg_file'],self._driver_config['driver_cfg_file']['node_cfg_file'])
+            attrs = self.nodeCfgFile.GetNodeAttrDict()
+            self._platform_attributes = attrs
+            log.debug("%r: platform attributes taken from config files: %s",
+                      self._platform_id, self._platform_attributes)
+        elif 'attributes' in self._driver_config:
             attrs = self._driver_config['attributes']
             self._platform_attributes = attrs
             log.debug("%r: platform attributes taken from driver_config: %s",
@@ -2950,7 +2968,7 @@ class PlatformAgent(ResourceAgent):
             raise PlatformDriverException(msg)
 
         self._platform_resource_monitor = PlatformResourceMonitor(
-            self._platform_id, self._platform_attributes,
+            self._platform_id,self._platform_attributes,self._stream_config,
             self._get_attribute_values, self.evt_recv)
 
         self._platform_resource_monitor.start_resource_monitoring()
