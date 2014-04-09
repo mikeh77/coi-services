@@ -29,10 +29,11 @@ class PlatformResourceMonitor(object):
     Resource monitoring for a given platform.
     """
 
-    def __init__(self, platform_id, attr_info, get_attribute_values, notify_driver_event):
+    def __init__(self, platform_id, attr_info, stream_info,get_attribute_values, notify_driver_event):
         """
         @param platform_id Platform ID
         @param attr_info Attribute information
+        @param stream_info Stream information for this Platform
         @param get_attribute_values Function to retrieve attribute
                  values for the specific platform, called like this:
                  get_attribute_values([attr_id], from_time)
@@ -43,6 +44,7 @@ class PlatformResourceMonitor(object):
 
         self._platform_id = platform_id
         self._attr_info = attr_info
+        self._stream_info = stream_info
         self._get_attribute_values = get_attribute_values
         self._notify_driver_event = notify_driver_event
 
@@ -197,15 +199,26 @@ class PlatformResourceMonitor(object):
         Initializes self._buffers (empty arrays for each attribute)
         """
         self._buffers = {}
-        for attr_id, attr_defn in self._attr_info.iteritems():
+        for attr_key, attr_defn in self._attr_info.iteritems():
             if 'monitor_cycle_seconds' not in attr_defn:
                 log.warn("%r: unexpected: attribute info does not contain %r. "
                          "attr_defn = %s",
                          self._platform_id,
                          'monitor_cycle_seconds', attr_defn)
                 continue
+            if 'ion_parameter_name' not in attr_defn:
+                log.warn("%r: unexpected: attribute info does not contain %r. "
+                         "attr_defn = %s",
+                         self._platform_id,
+                         'ion_parameter_name', attr_defn)
+                continue
 
-            self._buffers[attr_id] = []
+          
+
+            self._buffers[attr_defn['ion_parameter_name']] = []
+            
+            log.debug('*********%r: Created Buffer for =%s',
+                      self._platform_id, attr_defn['ion_parameter_name'])
 
     def _receive_from_monitor(self, driver_event):
         """
@@ -223,6 +236,11 @@ class PlatformResourceMonitor(object):
                       self._platform_id, driver_event)
 
             for param_name, param_value in driver_event.vals_dict.iteritems():
+                if param_name not in self._buffers:
+                    log.warn("unexpected: param_name %s does not in list of available buffers %s ",
+                         param_name,
+                         self._buffers)
+                    continue
                 self._buffers[param_name] += param_value
 
     def _set_publisher_rate(self):
@@ -279,13 +297,20 @@ class PlatformResourceMonitor(object):
         @note The platform agent will translate any None entries to
               corresponding fill_values.
         """
-
+        log.debug("%r: _dispatch_publication: %s", self._platform_id,self._buffers)
+        
+                 
+                
+        
+        
+        
         # step 1:
         # - collect all actual values in a dict indexed by timestamp
         # - keep track of the attributes having actual values
         by_ts = {}  # { ts0 : { attr_n : val_n, ... }, ... }
         attrs_with_actual_values = set()
         for attr_id, attr_vals in self._buffers.iteritems():
+
             for v, ts in attr_vals:
                 if not ts in by_ts:
                     by_ts[ts] = {}
@@ -347,20 +372,49 @@ class PlatformResourceMonitor(object):
             for ts in sorted(by_ts.iterkeys()):
                 val = by_ts[ts][attr_id]
                 vals_dict[attr_id].append((val, ts))
+                
+        """
+        new Step 4: MikeH - The buffers have data from all possible streams form this
+        node - So go through and put them into their own set of buffers before before publishing each stream
+        """
+         
+        for stream_name, stream_config in self._stream_info.iteritems():
+            if 'stream_def_dict' not in stream_config:
+                msg = "_dispatch_publication: validate_configuration: 'stream_def_dict' key not in configuration for stream %r" % stream_name
+                log.error(msg)
+                return
+            else :
+#                log.trace("%r: _dispatch_publication: stream name %s stream dict %s", self._platform_id,stream_name,stream_config['stream_def_dict'])
+                log.trace("%r: _dispatch_publication: stream name %s stream ", self._platform_id,stream_name)
+            
+            stream_vals_dict = {}
+            
+            for attr_name in stream_config['stream_def_dict']['parameter_dictionary'].iterkeys():
+                log.trace("%r: _dispatch_publication: stream name %s attr %s", self._platform_id,stream_name,attr_name)
+                
+                for attr_id in vals_dict:
+                    if attr_id == attr_name :
+                        stream_vals_dict[attr_id] = vals_dict[attr_id]
+                        log.trace("%r: _dispatch_publication: stream name %s attr %s copied to stream_vals_dict", self._platform_id,stream_name,attr_name)
+  
 
         # finally, create and notify event:
-        driver_event = AttributeValueDriverEvent(self._platform_id,
-                                                 _STREAM_NAME,
-                                                 vals_dict)
+            
+            if len(stream_vals_dict) > 0 :
+                log.trace("%r: _dispatch_publication: stream name %s attr %s copied to stream_vals_dict", self._platform_id,stream_name,attr_name)
+            
+                driver_event = AttributeValueDriverEvent(self._platform_id,
+                                                 stream_name,
+                                                 stream_vals_dict)
 
-        log.debug("%r: _dispatch_publication: notifying event: %s",
-                  self._platform_id, driver_event)
+                log.debug("%r: _dispatch_publication: notifying event: %s",
+                                  self._platform_id, driver_event)
 
-        if log.isEnabledFor(logging.TRACE):  # pragma: no cover
-            log.trace("%r: vals_dict:\n%s",
-                      self._platform_id, self._pp.pformat(driver_event.vals_dict))
+                if log.isEnabledFor(logging.TRACE):  # pragma: no cover
+                   log.trace("%r: vals_dict:\n%s",
+                                self._platform_id, self._pp.pformat(driver_event.vals_dict))
 
-        self._notify_driver_event(driver_event)
+                self._notify_driver_event(driver_event)
 
     def _stop_publisher_greenlet(self):
         if self._publisher_active:

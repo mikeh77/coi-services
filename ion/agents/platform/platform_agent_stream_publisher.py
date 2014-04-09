@@ -33,7 +33,7 @@ from pyon.core.object import IonObjectDeserializer
 import uuid
 
 import logging
-
+import pprint
 
 class PlatformAgentStreamPublisher(object):
     """
@@ -150,6 +150,14 @@ class PlatformAgentStreamPublisher(object):
         else:
             rdt = RecordDictionaryTool(stream_definition=stream_def)
 
+        log.trace("%r:====== rdt = %s",
+                      self._platform_id, self._pp.pformat(rdt))
+        log.trace("%r: ====== param_dict = %s",
+                      self._platform_id, self._pp.pformat(param_dict))
+        log.trace("%r: ====== stream_def = %s",
+                      self._platform_id, self._pp.pformat(stream_def))
+	
+
         self._publish_granule_with_multiple_params(publisher, driver_event,
                                                    param_dict, rdt)
 
@@ -157,16 +165,19 @@ class PlatformAgentStreamPublisher(object):
                                               param_dict, rdt):
 
         stream_name = driver_event.stream_name
-
+        
+	log.trace("%r: =========stream_name = %s", self._platform_id, stream_name)
+  
         pub_params = {}
         selected_timestamps = None
 
         for param_name, param_value in driver_event.vals_dict.iteritems():
-
             in_rdt = False
             param_name = param_name.lower()
+	    param_name = param_name.replace(" ", "_")
             if param_name in rdt:
                 in_rdt = True
+	        log.trace("%r: =======in rdt", self._platform_id)
             else:
                 if param_name not in self._unconfigured_params:
                     # an unrecognized attribute for this platform:
@@ -188,6 +199,7 @@ class PlatformAgentStreamPublisher(object):
                 if separator >= 0:
                     # try the attr-name part:
                     attr_name = param_name[:separator]
+	            log.trace("%r: =======attr_name(|)%s", self._platform_id,attr_name)
                     if attr_name in rdt:
                         # so, we found the attr-name part in the RDT; let's
                         # use that and note that we will be ignoring the
@@ -206,6 +218,7 @@ class PlatformAgentStreamPublisher(object):
                                      self._platform_id, attr_name, stream_name, list(rdt.iterkeys()))
 
             if not in_rdt:
+	        log.trace("%r:not in rdt", self._platform_id)
                 continue
 
             # separate values and timestamps:
@@ -238,6 +251,8 @@ class PlatformAgentStreamPublisher(object):
             selected_timestamps = timestamps
 
         if selected_timestamps is None:
+	    log.trace("%r: =======all parm_names were unrecognized", self._platform_id)
+  
             # that is, all param_name's were unrecognized; just return:
             return
 
@@ -246,6 +261,8 @@ class PlatformAgentStreamPublisher(object):
 
     def _publish_granule(self, stream_name, publisher, param_dict, rdt,
                          pub_params, timestamps):
+
+	log.trace("%r: ======== publish_granule", self._platform_id)
 
         # Set timestamp info in rdt:
         if param_dict.temporal_parameter_name is not None:
