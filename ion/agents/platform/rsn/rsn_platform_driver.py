@@ -35,7 +35,7 @@ from pyon.core.object import ion_serializer, IonObjectDeserializer
 from pyon.core.registry import IonObjectRegistry
 from ion.core.ooiref import OOIReferenceDesignator
 
-from ion.agents.platform.util.NodeConfiguration import NodeConfiguration
+from ion.agents.platform.util import node_configuration.NodeConfiguration
 
 class RSNPlatformDriverState(PlatformDriverState):
     """

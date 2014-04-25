@@ -32,7 +32,7 @@ from ion.agents.platform.platform_driver_event import StateChangeDriverEvent
 from ion.agents.platform.platform_driver_event import AsyncAgentEvent
 from ion.agents.platform.exceptions import CannotInstantiateDriverException
 from ion.agents.platform.util.network_util import NetworkUtil
-from ion.agents.platform.util.NodeConfiguration import NodeConfiguration
+from ion.agents.platform.util import node_configuration.NodeConfiguration
 from ion.agents.agent_alert_manager import AgentAlertManager
 
 from ion.agents.platform.platform_driver import PlatformDriverEvent, PlatformDriverState
@@ -461,7 +461,7 @@ class PlatformAgent(ResourceAgent):
         #
         if 'driver_cfg_file' in self._driver_config:
             log.debug("PlatformAgent.read_driver_config_file= %s" %self._driver_config['driver_cfg_file'])
-            self.nodeCfgFile = NodeConfiguration()
+            self.nodeCfgFile = node_configuration()
             self.nodeCfgFile.Open(self._platform_id,self._driver_config['driver_cfg_file']['default_cfg_file'],self._driver_config['driver_cfg_file']['node_cfg_file'])
             attrs = self.nodeCfgFile.GetNodeAttrDict()
             self._platform_attributes = attrs

@@ -40,6 +40,12 @@ class PlatformConfigurationException(PlatformException):
     """
     pass
 
+class NodeConfigurationFileException(PlatformException):
+    """
+    Exception related with the node configuration file
+    """
+    pass
+
 
 class PlatformDefinitionException(PlatformException):
     """
