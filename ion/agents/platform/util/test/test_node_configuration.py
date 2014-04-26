@@ -11,11 +11,11 @@ __author__ = 'Mike Harrington'
 __license__ = 'Apache 2.0'
 
 #
-# bin/nosetests -sv ion.agents.platform.util.test.test_NodeConfiguration:Test.test_read_files
-# bin/nosetests -sv ion.agents.platform.util.test.test_NodeConfiguration:Test.test_bad_default_file
-# bin/nosetests -sv ion.agents.platform.util.test.test_NodeConfiguration:Test.test_bad_node_config_file
-# bin/nosetests -sv ion.agents.platform.util.test.test_NodeConfiguration:Test.test_scale_factors
-# bin/nosetests -sv ion.agents.platform.util.test.test_NodeConfiguration:Test.test_attr_lookup
+# bin/nosetests -sv ion.agents.platform.util.test.test_node_configuration:Test.test_read_files
+# bin/nosetests -sv ion.agents.platform.util.test.test_node_configuration:Test.test_bad_default_file
+# bin/nosetests -sv ion.agents.platform.util.test.test_node_configuration:Test.test_bad_node_config_file
+# bin/nosetests -sv ion.agents.platform.util.test.test_node_configuration:Test.test_scale_factors
+# bin/nosetests -sv ion.agents.platform.util.test.test_node_configuration:Test.test_attr_lookup
 #
 
 from pyon.public import log
