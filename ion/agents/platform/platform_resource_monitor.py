@@ -400,12 +400,21 @@ class PlatformResourceMonitor(object):
 
         # finally, create and notify event:
             
-            if len(stream_vals_dict) > 0 :
+            #remove any time-slices that do not have any attribute values for this stream
+            #before publishing
+            compact_stream_vals_dict = self._remove_empty_ts(stream_vals_dict)
+            
+            
+            if len(compact_stream_vals_dict) > 0 :
+            
+                
+                
+                
                 log.trace("%r: _dispatch_publication: stream name %s attr %s copied to stream_vals_dict", self._platform_id,stream_name,attr_name)
             
                 driver_event = AttributeValueDriverEvent(self._platform_id,
                                                  stream_name,
-                                                 stream_vals_dict)
+                                                 compact_stream_vals_dict)
 
                 log.debug("%r: _dispatch_publication: notifying event: %s",
                                   self._platform_id, driver_event)
@@ -415,6 +424,36 @@ class PlatformResourceMonitor(object):
                                 self._platform_id, self._pp.pformat(driver_event.vals_dict))
 
                 self._notify_driver_event(driver_event)
+
+    def _remove_empty_ts(self,stream_vals_dict):
+        # Go through and remove any timestamps that have all attributes set to None            
+        compact_stream_vals_dict = {}
+        by_ts = {}
+
+        # Count the number of attributes not equal to None for each timestamp
+        for attr_id in stream_vals_dict:
+            vals_list = stream_vals_dict[attr_id]
+            for attr_pair in vals_list :
+                if attr_pair[1] not in by_ts:
+                    by_ts[attr_pair[1]]=0
+                if attr_pair[0]!=None:
+                    by_ts[attr_pair[1]]+=1
+           
+        # make a new list with just timestamps that had at least one attribute != None
+        # and then add it to the compact_stream_vals 
+        # compact_stream_vals could be empty on return   
+        for attr_id in stream_vals_dict:
+            compact_list = []
+            vals_list = stream_vals_dict[attr_id]
+            for attr_pair in vals_list :
+                if by_ts[attr_pair[1]]>0:
+                    compact_list.append(attr_pair)
+            
+            if len(compact_list)>0 :
+                compact_stream_vals_dict[attr_id]=compact_list 
+            
+        return(compact_stream_vals_dict)
+
 
     def _stop_publisher_greenlet(self):
         if self._publisher_active:

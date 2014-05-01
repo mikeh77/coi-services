@@ -44,7 +44,8 @@ class Test(IonUnitTestCase):
 
         nodeConfig = NodeConfiguration()
   
-        nodeConfig.Open('LPJBox_CI','/tmp/node_config_files/default_node.yaml','/tmp/node_config_files/LPJBox_LJ0CI.yaml')
+#        nodeConfig.Open('LPJBox_CI','/tmp/node_config_files/default_node.yaml','/tmp/node_config_files/LPJBox_LJ0CI.yaml')
+        nodeConfig.Open('DeepProfilerSim','/tmp/node_config_files/default_dp_node.yaml','/tmp/node_config_files/DeepProfilerSim.yaml')
         
         nodeConfig.Print()
  
