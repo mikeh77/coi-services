@@ -30,6 +30,7 @@ from ion.agents.platform.exceptions import PlatformException
 from ion.agents.platform.platform_driver_event import AttributeValueDriverEvent
 from ion.agents.platform.platform_driver_event import StateChangeDriverEvent
 from ion.agents.platform.platform_driver_event import AsyncAgentEvent
+from ion.agents.platform.platform_driver_event import OMSEventDriverEvent
 from ion.agents.platform.exceptions import CannotInstantiateDriverException
 from ion.agents.platform.util.network_util import NetworkUtil
 from ion.agents.platform.util.node_configuration import NodeConfiguration
@@ -1005,6 +1006,11 @@ class PlatformAgent(ResourceAgent):
             self._async_driver_event_agent_event(driver_event.event)
             return
 
+        if isinstance(driver_event, OMSEventDriverEvent):
+            self._oms_driver_event_agent_event(driver_event)
+            return
+
+
         else:
             log.warn('%r: driver_event not handled: %s',
                      self._platform_id, str(type(driver_event)))
@@ -1024,6 +1030,22 @@ class PlatformAgent(ResourceAgent):
         except Exception:
             log.exception('%r: platform agent could not publish driver state change event',
                           self._platform_id)
+            
+    def _oms_driver_event_agent_event(self, message):
+        """
+        @param event   oms event.
+        """
+        log.debug('%r: OMS platform agent driver OMS Event: %s', self._platform_id, message)
+        try:
+            event_data = {'message': message}
+            self._event_publisher.publish_event(event_type='OMSEventReceived',
+                                                origin_type=self.ORIGIN_TYPE,
+                                                origin=self.resource_id,
+                                                **event_data)
+        except Exception:
+            log.exception('%r: platform agent could not publish driver OMS Event:',
+                          self._platform_id)
+
 
     def _dispatch_value_alerts(self, stream_name, param_name, vals):
         """
