@@ -173,11 +173,9 @@ class PlatformAgentStreamPublisher(object):
 
         for param_name, param_value in driver_event.vals_dict.iteritems():
             in_rdt = False
-            param_name = param_name.lower()
-	    param_name = param_name.replace(" ", "_")
             if param_name in rdt:
                 in_rdt = True
-	        log.trace("%r: =======in rdt", self._platform_id)
+                log.trace("%r: =======in rdt %s", self._platform_id,param_name)
             else:
                 if param_name not in self._unconfigured_params:
                     # an unrecognized attribute for this platform:
@@ -186,39 +184,9 @@ class PlatformAgentStreamPublisher(object):
                              ' rdt.keys=%s',
                              self._platform_id, param_name, stream_name, list(rdt.iterkeys()))
 
+ 
             if not in_rdt:
-                # OOIION-1551 The following is temporary to facilitate
-                # transitioning to the use of the new attr-id format in
-                # resources like the preload. So, for the moment, the following
-                # checks whether the name part is in the RDT to then use that
-                # instead of simply logging a warning and skipping this
-                # parameter.
-                # Note: we still log the warning above for the original
-                # param_name to facilitate general inspection.
-                separator = param_name.rfind('|')
-                if separator >= 0:
-                    # try the attr-name part:
-                    attr_name = param_name[:separator]
-	            log.trace("%r: =======attr_name(|)%s", self._platform_id,attr_name)
-                    if attr_name in rdt:
-                        # so, we found the attr-name part in the RDT; let's
-                        # use that and note that we will be ignoring the
-                        # attr-instance part in this case. Again, this is
-                        # temporary to facilitate review/transition.
-                        log.warn('%r: OOIION-1551: will use %r, which was found '
-                                 'in RDT. The original %r was not.',
-                                 self._platform_id, attr_name, param_name)
-                        in_rdt = True
-                        param_name = attr_name
-                    else:
-                        if attr_name not in self._unconfigured_params:
-                            self._unconfigured_params.add(attr_name)
-                            log.warn('%r: got attribute value event for unconfigured parameter %r in stream %r'
-                                     ' rdt.keys=%s',
-                                     self._platform_id, attr_name, stream_name, list(rdt.iterkeys()))
-
-            if not in_rdt:
-	        log.trace("%r:not in rdt", self._platform_id)
+	        log.trace("%r:not in rdt %s", self._platform_id,param_name)
                 continue
 
             # separate values and timestamps:

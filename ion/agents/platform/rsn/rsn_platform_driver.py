@@ -26,7 +26,14 @@ from ion.agents.platform.exceptions import PlatformConnectionException
 from ion.agents.platform.rsn.oms_client_factory import CIOMSClientFactory
 from ion.agents.platform.responses import NormalResponse, InvalidResponse
 
+
+from ion.agents.platform.platform_driver_event import OMSEventDriverEvent
+
+from pyon.util.containers import get_ion_ts
+
 from ion.agents.platform.util import ion_ts_2_ntp
+
+from pyon.event.event import EventSubscriber
 
 from pyon.agent.common import BaseEnum
 from pyon.agent.instrument_fsm import FSMError
@@ -35,7 +42,7 @@ from pyon.core.object import ion_serializer, IonObjectDeserializer
 from pyon.core.registry import IonObjectRegistry
 from ion.core.ooiref import OOIReferenceDesignator
 
-from ion.agents.platform.util.NodeConfiguration import NodeConfiguration
+from ion.agents.platform.util.node_configuration import NodeConfiguration
 
 class RSNPlatformDriverState(PlatformDriverState):
     """
@@ -52,6 +59,8 @@ class RSNPlatformDriverEvent(PlatformDriverEvent):
     DISCONNECT_INSTRUMENT     = 'RSN_PLATFORM_DRIVER_DISCONNECT_INSTRUMENT'
     TURN_ON_PORT              = 'RSN_PLATFORM_DRIVER_TURN_ON_PORT'
     TURN_OFF_PORT             = 'RSN_PLATFORM_DRIVER_TURN_OFF_PORT'
+    START_PROFILER_MISSION    = 'RSN_PLATFORM_DRIVER_START_PROFILER_MISSION'
+    ABORT_PROFILER_MISSION    = 'RSN_PLATFORM_DRIVER_ABORT_PROFILER_MISSION'
     CHECK_SYNC                = 'RSN_PLATFORM_DRIVER_CHECK_SYNC'
 
 
@@ -60,6 +69,10 @@ class RSNPlatformDriverCapability(BaseEnum):
     DISCONNECT_INSTRUMENT     = RSNPlatformDriverEvent.DISCONNECT_INSTRUMENT
     TURN_ON_PORT              = RSNPlatformDriverEvent.TURN_ON_PORT
     TURN_OFF_PORT             = RSNPlatformDriverEvent.TURN_OFF_PORT
+    START_PROFILER_MISSION    = RSNPlatformDriverEvent.START_PROFILER_MISSION
+    ABORT_PROFILER_MISSION    = RSNPlatformDriverEvent.ABORT_PROFILER_MISSION
+ 
+    
 #    OOIION-1623 Remove until Check Sync requirements fully defined
 #    CHECK_SYNC                = RSNPlatformDriverEvent.CHECK_SYNC
 
@@ -220,7 +233,7 @@ class RSNPlatformDriver(PlatformDriver):
                        'port_id' : {
                             "required" : True,
                             "type" : "int",
-                            "valid_values" : ports
+#                            "valid_values" : []
                         }
                 }
 
@@ -274,6 +287,16 @@ class RSNPlatformDriver(PlatformDriver):
 
         return "PONG"
 
+    def callback_for_alert(self, event, *args, **kwargs):
+        log.debug("caught an OMSDeviceStatusEvent: %s", event)       
+        
+#        self._notify_driver_event(OMSEventDriverEvent(event['description']))
+     
+        log.info('Platform agent %r published OMSDeviceStatusEvent : %s, time: %s',
+                 self._platform_id, event, get_ion_ts())
+
+
+    
     def connect(self, recursion=None):
         """
         Creates an CIOMSClient instance, does a ping to verify connection,
@@ -292,6 +315,12 @@ class RSNPlatformDriver(PlatformDriver):
 
         # start event dispatch:
         self._start_event_dispatch()
+        
+
+        self.event_subscriber = EventSubscriber(event_type='OMSDeviceStatusEvent',
+            callback=self.callback_for_alert)
+
+        self.event_subscriber.start()
 
         # TODO(OOIION-1495) review the following. Commented out for the moment.
         # Note, per the CI-OMS spec ports need to be turned OFF to then proceed
@@ -314,12 +343,13 @@ class RSNPlatformDriver(PlatformDriver):
         Stops event dispatch and destroys the CIOMSClient instance.
         """
         self._stop_event_dispatch()
-
+        self.event_subscriber.stop()
+        self.event_subscriber=None
         # TODO(OOIION-1495) review the following. Only change is the use
         # of self._pnode.ports instead of self._active_ports,
         # while we address the "active ports" concept mentioned above.
         # Also, it is probably OK to turn off all ports in this "disconnect
-        # driver" operation.
+        # driver" operation.fe
 
         # power off all ports with connected devices
         if recursion:
@@ -714,7 +744,7 @@ class RSNPlatformDriver(PlatformDriver):
             raise PlatformConnectionException("Cannot turn_off_platform_port: _rsn_oms object required (created via connect() call)")
 
         try:
-            response = self._rsn_oms.port.turn_off_platform_port(self._platform_id,
+            response = self._rsn_oms.profiler.turn_off_platform_port(self._platform_id,
                                                                  port_id)
         except Exception as e:
             raise PlatformConnectionException(msg="Cannot turn_off_platform_port: %s" % str(e))
@@ -726,6 +756,51 @@ class RSNPlatformDriver(PlatformDriver):
         self._verify_port_id_in_response(port_id, dic_plat)
 
         return dic_plat  # note: return the dic for the platform
+
+
+    
+    
+    def start_profiler_mission(self, mission_name):
+        log.debug("%r: starting_profiler_mission: port_id=%s",
+                  self._platform_id, mission_name)
+
+        if self._rsn_oms is None:
+            raise PlatformConnectionException("Cannot start_profiler_mission: _rsn_oms object required (created via connect() call)")
+
+        try:
+            response = self._rsn_oms.port.start_profiler_mission(self._platform_id,
+                                                                mission_name)
+        except Exception as e:
+            raise PlatformConnectionException(msg="Cannot start_profiler_mission: %s" % str(e))
+
+        log.debug("%r: start_profiler_mission response: %s",
+                  self._platform_id, response)
+
+        dic_plat = self._verify_platform_id_in_response(response)
+        self._verify_port_id_in_response(port_id, dic_plat)
+
+        return dic_plat  # note: return the dic for the platform
+
+    def abort_profiler_mission(self):
+        log.debug("%r: abort_profiler_mission:",
+                  self._platform_id)
+
+        if self._rsn_oms is None:
+            raise PlatformConnectionException("Cannot abort_profiler_mission: _rsn_oms object required (created via connect() call)")
+
+        try:
+            response = self._rsn_oms.profiler.abort_profiler_mission(self._platform_id)
+        except Exception as e:
+            raise PlatformConnectionException(msg="Cannot abort_profiler_mission: %s" % str(e))
+
+        log.debug("%r: abort_profiler_mission response: %s",
+                  self._platform_id, response)
+
+        dic_plat = self._verify_platform_id_in_response(response)
+        self._verify_port_id_in_response(port_id, dic_plat)
+
+        return dic_plat  # note: return the dic for the platform
+
 
     ###############################################
     # External event handling:
@@ -790,6 +865,10 @@ class RSNPlatformDriver(PlatformDriver):
         host = CFG.get_safe('server.oms.host', "localhost")
         port = CFG.get_safe('server.oms.port', "5000")
         path = CFG.get_safe('server.oms.path', "/ion-service/oms_event")
+
+        #the above are defined in pyon.cfg
+        #we will override local host for debugging inside the VM
+        host = "10.208.79.19"
 
         self.listener_url = "http://%s:%s%s" % (host, port, path)
         self._register_event_listener(self.listener_url)
@@ -938,6 +1017,13 @@ class RSNPlatformDriver(PlatformDriver):
 
         elif cmd == RSNPlatformDriverEvent.DISCONNECT_INSTRUMENT:
             result = self.disconnect_instrument(*args, **kwargs)
+            
+        elif cmd == RSNPlatformDriverEvent.START_PROFILER_MISSION:
+            result = self.start_profiler_mission(*args, **kwargs)
+
+        elif cmd == RSNPlatformDriverEvent.ABORT_PROFILER_MISSION:
+            result = self.abort_profiler_mission(*args, **kwargs)
+
 
         else:
             result = super(RSNPlatformDriver, self).execute(cmd, args, kwargs)
@@ -1031,6 +1117,46 @@ class RSNPlatformDriver(PlatformDriver):
                                          args, kwargs, e)
 
         return next_state, result
+    
+    
+    def _handler_connected_start_profiler_mission(self, *args, **kwargs):
+        """
+        """
+        if log.isEnabledFor(logging.TRACE):  # pragma: no cover
+            log.trace("%r/%s args=%s kwargs=%s" % (
+                      self._platform_id, self.get_driver_state(),
+                      str(args), str(kwargs)))
+        
+#        profile_mission_name = kwargs.get('profile_mission_name', None)
+        profile_mission_name = kwargs.get('profile_mission_name', 'Test_Profile_Mission_Name')
+        if profile_mission_name is None :
+            raise FSMError('start_profiler_mission: missing profile_mission_name argument')
+
+
+        try:
+            result = self.start_profiler_mission(profile_mission_name)
+            return None, result
+
+        except PlatformConnectionException as e:
+            return self._connection_lost(RSNPlatformDriverEvent.START_PROFILER_MISSION,
+                                         args, kwargs, e)
+            
+    def _handler_connected_abort_profiler_mission(self, *args, **kwargs):
+        """
+        """
+        if log.isEnabledFor(logging.TRACE):  # pragma: no cover
+            log.trace("%r/%s args=%s kwargs=%s" % (
+                      self._platform_id, self.get_driver_state(),
+                      str(args), str(kwargs)))
+
+        try:
+            result = self.abort_profiler_mission()
+            return None, result
+
+        except PlatformConnectionException as e:
+            return self._connection_lost(RSNPlatformDriverEvent.ABORT_PROFILER_MISSION,
+                                         args, kwargs, e)
+    
 
     def _handler_connected_turn_on_port(self, *args, **kwargs):
         """
@@ -1109,4 +1235,6 @@ class RSNPlatformDriver(PlatformDriver):
         self._fsm.add_handler(PlatformDriverState.CONNECTED, RSNPlatformDriverEvent.DISCONNECT_INSTRUMENT, self._handler_connected_disconnect_instrument)
         self._fsm.add_handler(PlatformDriverState.CONNECTED, RSNPlatformDriverEvent.TURN_ON_PORT, self._handler_connected_turn_on_port)
         self._fsm.add_handler(PlatformDriverState.CONNECTED, RSNPlatformDriverEvent.TURN_OFF_PORT, self._handler_connected_turn_off_port)
+        self._fsm.add_handler(PlatformDriverState.CONNECTED, RSNPlatformDriverEvent.START_PROFILER_MISSION, self._handler_connected_start_profiler_mission)
+        self._fsm.add_handler(PlatformDriverState.CONNECTED, RSNPlatformDriverEvent.ABORT_PROFILER_MISSION, self._handler_connected_abort_profiler_mission)
         self._fsm.add_handler(PlatformDriverState.CONNECTED, RSNPlatformDriverEvent.CHECK_SYNC, self._handler_connected_check_sync)

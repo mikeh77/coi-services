@@ -237,6 +237,7 @@ def process_gateway_request(service_name, operation):
         json_params = None
         if request.method == "POST":
             payload = request.form['payload']
+
             #debug only
             #payload = '{"serviceRequest": { "serviceName": "resource_registry", "serviceOp": "find_resources", "params": { "restype": "BankAccount", "lcstate": "", "name": "", "id_only": false } } }'
             json_params = json_loads(str(payload))
@@ -257,7 +258,8 @@ def process_gateway_request(service_name, operation):
                 raise Inconsistent("Target service operation in the JSON request (%s) does not match service name in URL (%s)" % ( str(json_params['serviceRequest']['serviceOp']), operation ) )
 
         param_list = create_parameter_list('serviceRequest', service_name, target_client,operation, json_params)
-
+        
+ 
 
         #Validate requesting user and expiry and add governance headers
         ion_actor_id, expiry = get_governance_info_from_request('serviceRequest', json_params)
@@ -284,6 +286,8 @@ def process_gateway_request(service_name, operation):
 @service_gateway_app.route('/ion-agent/<resource_id>/<operation>', methods=['POST'])
 def process_gateway_agent_request(resource_id, operation):
 
+    log.info('------process_gateway_agent_request resource_id = %s operation = %s' % (resource_id,operation))
+
     try:
 
         if not resource_id:
@@ -301,6 +305,7 @@ def process_gateway_agent_request(resource_id, operation):
         json_params = None
         if request.method == "POST":
             payload = request.form['payload']
+            log.info('------process_gateway_request payload = %s ' % str(payload))
 
             json_params = json_loads(str(payload))
 
@@ -322,6 +327,9 @@ def process_gateway_agent_request(resource_id, operation):
         resource_agent = ResourceAgentClient(resource_id, node=Container.instance.node, process=service_gateway_instance)
 
         param_list = create_parameter_list('agentRequest', 'resource_agent', ResourceAgentProcessClient, operation, json_params)
+
+        log.info('------process_gateway_request param_list = %s ' % str(param_list))
+
 
         #Validate requesting user and expiry and add governance headers
         ion_actor_id, expiry = get_governance_info_from_request('agentRequest', json_params)
@@ -348,32 +356,41 @@ def process_gateway_agent_request(resource_id, operation):
 @service_gateway_app.route('/ion-service/oms_event', methods=['GET','POST'])
 def process_oms_event():
 
+    log.info('------process_oms_event ')
+
+    event_list = []
     json_params = {}
 
     # oms direct request
     if request.data:
-        json_params  = json_loads(str(request.data))
-        log.debug('ServiceGatewayService:process_oms_event request.data:  %s', json_params)
+        event_list  = json_loads(str(request.data))
+        log.info('ServiceGatewayService:process_oms_event request.data:  %s', event_list)
 
+    if len(event_list)<1 :
+        log.error('Did not get a list of Events from the OMS %s', e.message, json_params)
+        return gateway_json_response(OMS_ACCEPTED_RESPONSE)
+  
+    #OMS is actually returning a list of Events...
     #validate payload
-    if 'platform_id' not in json_params or 'message' not in json_params:
-        log.warning('Invalid OMS event format. payload_data: %s', json_params)
-        #return gateway_json_response(OMS_BAD_REQUEST_RESPONSE)
+    for json_params in event_list :
+        if 'platform_id' not in json_params or 'message' not in json_params:
+            log.warning('Invalid OMS event format. payload_data: %s', json_params)
+            #return gateway_json_response(OMS_BAD_REQUEST_RESPONSE)
 
-    #prepare the event information
-    try:
-        #create a publisher to relay OMS events into the system as DeviceEvents
-        event_publisher = EventPublisher()
+        #prepare the event information
+        try:
+            #create a publisher to relay OMS events into the system as DeviceEvents
+            event_publisher = EventPublisher()
 
-        event_publisher.publish_event(
-            event_type='OMSDeviceStatusEvent',
-            origin_type='OMS Platform',
-            origin=json_params.get('platform_id', 'NOT PROVIDED'),
-            sub_type='',
-            description = json_params.get('message', ''),
-            status_details = json_params)
-    except Exception, e:
-        log.error('Could not publish OMS  event: %s. Event data: %s', e.message, json_params)
+            event_publisher.publish_event(
+                event_type='OMSDeviceStatusEvent',
+                origin_type='OMS Platform',
+                origin=json_params.get('platform_id', 'NOT PROVIDED'),
+                sub_type='',
+                description = json_params.get('message', ''),
+                status_details = json_params)
+        except Exception, e:
+            log.error('Could not publish OMS  event: %s. Event data: %s', e.message, json_params)
 
 
     return gateway_json_response(OMS_ACCEPTED_RESPONSE)
