@@ -105,6 +105,14 @@ class NodeConfiguration(object):
             self._attrLookup[attr['ion_parameter_name']]=attr['attr_id']
             self._scaleLookup[attr['attr_id']]=attr['scale_factor']
 
+
+    def GetOMSPortId(self,ui_port_name):
+        for portKey,port in self.port_configurations.iteritems():
+            if(port['port_ui_name']==ui_port_name):
+                return(port['port_oms_port_cntl_id'])
+        raise NodeConfigurationFileException(msg="GetOMSPortId Cannot find ui_port_name  : %s" % ui_port_name)
+
+
     
     def Print(self):
         log.debug("%r  Print Config File Information for: %s\n\n", self._platform_id, self.node_meta_data['node_id_name'])

@@ -16,6 +16,7 @@ __license__ = 'Apache 2.0'
 # bin/nosetests -sv ion.agents.platform.util.test.test_node_configuration:Test.test_bad_node_config_file
 # bin/nosetests -sv ion.agents.platform.util.test.test_node_configuration:Test.test_scale_factors
 # bin/nosetests -sv ion.agents.platform.util.test.test_node_configuration:Test.test_attr_lookup
+# bin/nosetests -sv ion.agents.platform.util.test.test_node_configuration:Test.test_oms_port_id
 #
 
 from pyon.public import log
@@ -118,5 +119,19 @@ class Test(IonUnitTestCase):
 
         self.assertEquals(nodeConfig.GetAttrFromParameter('sec_node_cib_5v_current'),'CIB 5V Current')
 
+    def test_oms_port_id(self):
+        nodeConfig = NodeConfiguration()
   
+        nodeConfig.Open('LPJBox_CI','/tmp/node_config_files/default_node.yaml','/tmp/node_config_files/LPJBox_LJ0CI.yaml')
+        
+        self.assertEquals(nodeConfig.GetOMSPortId('J05-IP1'),'0')
+
+        try:
+            nodeConfig.GetOMSPortId('junk')
+            self.assert_(False,'Did not Catch Exception')
+        except NodeConfigurationFileException as e:
+            log.debug("Correctly Caught Exception %s",e)
+
+        self.assertEquals(nodeConfig.GetOMSPortId('J06-IP2'),'1')
+
       
