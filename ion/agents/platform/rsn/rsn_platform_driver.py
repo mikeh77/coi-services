@@ -716,15 +716,24 @@ class RSNPlatformDriver(PlatformDriver):
         return dic_plat  # note: return the dic for the platform
 
     def turn_on_port(self, port_id):
-        log.debug("%r: turning on port: port_id=%s",
-                  self._platform_id, port_id)
+         
+         
+        try: 
+            oms_port_id = self.nodeCfgFile.GetOMSPortId(port_id);
+        except Exception as e:
+            raise PlatformConnectionException(msg="Cannot turn_on_platform_port: %s" % str(e))
+        
 
+        
+        log.debug("%r: turning on port: port_id=%s oms port_id = %s",
+                  self._platform_id, port_id,oms_port_id)
+ 
         if self._rsn_oms is None:
             raise PlatformConnectionException("Cannot turn_on_platform_port: _rsn_oms object required (created via connect() call)")
 
         try:
             response = self._rsn_oms.port.turn_on_platform_port(self._platform_id,
-                                                                port_id)
+                                                                oms_port_id,'CI - User')
         except Exception as e:
             raise PlatformConnectionException(msg="Cannot turn_on_platform_port: %s" % str(e))
 
@@ -732,20 +741,28 @@ class RSNPlatformDriver(PlatformDriver):
                   self._platform_id, response)
 
         dic_plat = self._verify_platform_id_in_response(response)
-        self._verify_port_id_in_response(port_id, dic_plat)
+        self._verify_port_id_in_response(oms_port_id, dic_plat)
 
         return dic_plat  # note: return the dic for the platform
 
     def turn_off_port(self, port_id):
-        log.debug("%r: turning off port: port_id=%s",
-                  self._platform_id, port_id)
+
+        try: 
+            oms_port_id = self.nodeCfgFile.GetOMSPortId(port_id);
+        except Exception as e:
+            raise PlatformConnectionException(msg="Cannot turn_off_platform_port: %s" % str(e))
+  
+        log.debug("%r: turning off port: port_id=%s oms port_id = %s",
+                  self._platform_id, port_id,oms_port_id)
+
+ 
 
         if self._rsn_oms is None:
             raise PlatformConnectionException("Cannot turn_off_platform_port: _rsn_oms object required (created via connect() call)")
 
         try:
-            response = self._rsn_oms.profiler.turn_off_platform_port(self._platform_id,
-                                                                 port_id)
+            response = self._rsn_oms.port.turn_off_platform_port(self._platform_id,
+                                                                 oms_port_id,'CI - User')
         except Exception as e:
             raise PlatformConnectionException(msg="Cannot turn_off_platform_port: %s" % str(e))
 
@@ -753,7 +770,7 @@ class RSNPlatformDriver(PlatformDriver):
                   self._platform_id, response)
 
         dic_plat = self._verify_platform_id_in_response(response)
-        self._verify_port_id_in_response(port_id, dic_plat)
+        self._verify_port_id_in_response(oms_port_id, dic_plat)
 
         return dic_plat  # note: return the dic for the platform
 
